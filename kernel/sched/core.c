@@ -767,7 +767,7 @@ static void set_load_weight(struct task_struct *p)
 static DEFINE_MUTEX(uclamp_mutex);
 
 /* Max allowed minimum utilization */
-unsigned int sysctl_sched_uclamp_util_min = 128;
+unsigned int sysctl_sched_uclamp_util_min = 0;
 
 /* Max allowed maximum utilization */
 unsigned int sysctl_sched_uclamp_util_max = SCHED_CAPACITY_SCALE;
@@ -8732,15 +8732,15 @@ static void uclamp_set(struct cgroup_subsys_state *css)
 	int i;
 
 	static struct uclamp_param tgts[] = {
-		{"top-app",            "10",  "max",  1, 1, 20480},
-		{"rt",			"0",  "max",  1, 0, 20480},
-		{"nnapi-hal",		"0",  "max",  1, 0, 20480},
-       		{"foreground",          "0",  "max",  1, 0, 20480},
-                {"camera-daemon",      "10",  "max",  1, 1, 20480},
-                {"system",              "0",  "max",  0, 0, 20480},
-                {"dex2oat",             "0",  "60",   0, 0,   512},
-        	{"background",          "0",  "50",   0, 0,  1024},
-        	{"system-background",   "0",  "50",   0, 0,  1024},
+		{"top-app",            "5",  "75",   0, 0, 20480},
+		{"rt",                 "0",   "max",  0, 0, 20480},
+		{"nnapi-hal",          "0",   "80",   0, 0, 20480},
+		{"foreground",         "3",   "60",   0, 0, 20480},
+		{"camera-daemon",      "5",  "max",  1, 0, 20480},
+		{"system",             "0",   "50",   0, 0, 20480},
+		{"dex2oat",            "0",   "50",   0, 0,   512},
+		{"background",         "0",   "25",   0, 0,  1024},
+		{"system-background",  "0",   "25",   0, 0,  1024},
 	};
 
         if(!css->cgroup->kn)
