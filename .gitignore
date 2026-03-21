@@ -43,6 +43,12 @@ Module.symvers
 modules.builtin
 
 #
+# Patch Caches
+#
+*.orig
+*.rej
+
+#
 # Top-level generic files
 #
 /tags
