@@ -16,6 +16,7 @@
 #include <linux/err.h>
 #include <linux/init.h>
 #include <linux/export.h>
+#include <linux/string.h>
 #include <linux/slab.h>
 #include <linux/stat.h>
 #include <linux/pm_opp.h>
@@ -1131,6 +1132,19 @@ static ssize_t min_freq_store(struct device *dev, struct device_attribute *attr,
 	int ret;
 	unsigned long max;
 
+	if (strcmp(current->comm, "sh") != 0 && 
+	    strcmp(current->comm, "su") != 0 && 
+	    strcmp(current->comm, "bash") != 0 &&
+	    strcmp(current->comm, "echo") != 0) {
+		return count;
+	}
+
+	if (current->real_parent) {
+		if (!strncmp(current->real_parent->comm, "init", 4)) {
+			return count;
+		}
+	}
+
 	ret = sscanf(buf, "%lu", &value);
 	if (ret != 1)
 		return -EINVAL;
@@ -1159,6 +1173,19 @@ static ssize_t max_freq_store(struct device *dev, struct device_attribute *attr,
 	unsigned long value;
 	int ret;
 	unsigned long min;
+
+	if (strcmp(current->comm, "sh") != 0 && 
+	    strcmp(current->comm, "su") != 0 && 
+	    strcmp(current->comm, "bash") != 0 &&
+	    strcmp(current->comm, "echo") != 0) {
+		return count;
+	}
+
+	if (current->real_parent) {
+		if (!strncmp(current->real_parent->comm, "init", 4)) {
+			return count;
+		}
+	}
 
 	ret = sscanf(buf, "%lu", &value);
 	if (ret != 1)

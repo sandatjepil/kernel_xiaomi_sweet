@@ -12,6 +12,7 @@
  */
 
 #include <linux/export.h>
+#include <linux/string.h>
 #include <linux/interrupt.h>
 #include <asm/page.h>
 #include <linux/pm_runtime.h>
@@ -628,6 +629,19 @@ static ssize_t kgsl_pwrctrl_max_pwrlevel_store(struct device *dev,
 	int ret;
 	unsigned int level = 0;
 
+	if (strcmp(current->comm, "sh") != 0 && 
+	    strcmp(current->comm, "su") != 0 && 
+	    strcmp(current->comm, "bash") != 0 &&
+	    strcmp(current->comm, "echo") != 0) {
+		return count;
+	}
+
+	if (current->real_parent) {
+		if (!strncmp(current->real_parent->comm, "init", 4)) {
+			return count;
+		}
+	}
+
 	if (device == NULL)
 		return 0;
 
@@ -694,6 +708,19 @@ static ssize_t kgsl_pwrctrl_min_pwrlevel_store(struct device *dev,
 	struct kgsl_device *device = kgsl_device_from_dev(dev);
 	int ret;
 	unsigned int level = 0;
+
+	if (strcmp(current->comm, "sh") != 0 && 
+	    strcmp(current->comm, "su") != 0 && 
+	    strcmp(current->comm, "bash") != 0 &&
+	    strcmp(current->comm, "echo") != 0) {
+		return count;
+	}
+
+	if (current->real_parent) {
+		if (!strncmp(current->real_parent->comm, "init", 4)) {
+			return count;
+		}
+	}
 
 	if (device == NULL)
 		return 0;
@@ -803,6 +830,19 @@ static ssize_t kgsl_pwrctrl_max_gpuclk_store(struct device *dev,
 	unsigned int val = 0;
 	int ret;
 
+	if (strcmp(current->comm, "sh") != 0 && 
+	    strcmp(current->comm, "su") != 0 && 
+	    strcmp(current->comm, "bash") != 0 &&
+	    strcmp(current->comm, "echo") != 0) {
+		return count;
+	}
+
+	if (current->real_parent) {
+		if (!strncmp(current->real_parent->comm, "init", 4)) {
+			return count;
+		}
+	}
+
 	if (device == NULL)
 		return 0;
 
@@ -855,6 +895,19 @@ static ssize_t kgsl_pwrctrl_gpuclk_store(struct device *dev,
 	struct kgsl_pwrctrl *pwr;
 	unsigned int val = 0;
 	int ret, level;
+
+	if (strcmp(current->comm, "sh") != 0 && 
+	    strcmp(current->comm, "su") != 0 && 
+	    strcmp(current->comm, "bash") != 0 &&
+	    strcmp(current->comm, "echo") != 0) {
+		return count;
+	}
+
+	if (current->real_parent) {
+		if (!strncmp(current->real_parent->comm, "init", 4)) {
+			return count;
+		}
+	}
 
 	if (device == NULL)
 		return 0;
@@ -1270,6 +1323,19 @@ static ssize_t kgsl_pwrctrl_min_clock_mhz_store(struct device *dev,
 	unsigned int freq;
 	struct kgsl_pwrctrl *pwr;
 
+	if (strcmp(current->comm, "sh") != 0 && 
+	    strcmp(current->comm, "su") != 0 && 
+	    strcmp(current->comm, "bash") != 0 &&
+	    strcmp(current->comm, "echo") != 0) {
+		return count;
+	}
+
+	if (current->real_parent) {
+		if (!strncmp(current->real_parent->comm, "init", 4)) {
+			return count;
+		}
+	}
+
 	if (device == NULL)
 		return 0;
 
@@ -1310,6 +1376,19 @@ static ssize_t kgsl_pwrctrl_max_clock_mhz_store(struct device *dev,
 	struct kgsl_device *device = kgsl_device_from_dev(dev);
 	unsigned int val = 0;
 	int ret;
+
+	if (strcmp(current->comm, "sh") != 0 && 
+	    strcmp(current->comm, "su") != 0 && 
+	    strcmp(current->comm, "bash") != 0 &&
+	    strcmp(current->comm, "echo") != 0) {
+		return count;
+	}
+
+	if (current->real_parent) {
+		if (!strncmp(current->real_parent->comm, "init", 4)) {
+			return count;
+		}
+	}
 
 	if (device == NULL)
 		return 0;
