@@ -460,7 +460,7 @@ static int smb5_charge_step_charge_init(struct smb_charger *chg,
 #define MICRO_P1A				100000
 #define MICRO_1PA				1000000
 #define MICRO_3PA				3000000
-#define MICRO_1P8A_FOR_DCP		2200000
+#define MICRO_1P8A_FOR_DCP		1800000
 #define MICRO_4PA				4000000
 #define OTG_DEFAULT_DEGLITCH_TIME_MS		50
 #define DEFAULT_WD_BARK_TIME			64
@@ -508,7 +508,8 @@ static int smb5_parse_dt(struct smb5 *chip)
 	chg->pd_not_supported = chg->pd_not_supported ||
 			of_property_read_bool(node, "qcom,usb-pd-disable");
 
-	chg->lpd_disabled = of_property_read_bool(node, "qcom,lpd-disable");
+	chg->lpd_disabled = chg->lpd_disabled ||
+			of_property_read_bool(node, "qcom,lpd-disable");
 
 	chg->qc_class_ab = of_property_read_bool(node,
 				"qcom,distinguish-qc-class-ab");
@@ -1077,8 +1078,7 @@ static int smb5_usb_get_prop(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_ONLINE:
 		rc = smblib_get_prop_usb_online(chg, val);
-		if ((!val->intval) &&
-			(!chg->pd_hard_reset && chg->pd_active == POWER_SUPPLY_PD_INACTIVE))
+		if (!val->intval)
 			break;
 
 		if (((chg->typec_mode == POWER_SUPPLY_TYPEC_SOURCE_DEFAULT) ||
@@ -1423,7 +1423,7 @@ static int smb5_usb_set_prop(struct power_supply *psy,
 		chg->apdo_max = val->intval;
 		break;
 	default:
-		pr_debug("set prop %d is not supported\n", psp);
+		pr_err("set prop %d is not supported\n", psp);
 		rc = -EINVAL;
 		break;
 	}
@@ -1546,7 +1546,7 @@ static int smb5_usb_port_set_prop(struct power_supply *psy,
 
 	switch (psp) {
 	default:
-		pr_debug("Set prop %d is not supported in pc_port\n",
+		pr_err_ratelimited("Set prop %d is not supported in pc_port\n",
 				psp);
 		rc = -EINVAL;
 		break;
@@ -1667,10 +1667,6 @@ static int smb5_usb_main_get_prop(struct power_supply *psy,
 		break;
 	/* Use this property to report SMB health */
 	case POWER_SUPPLY_PROP_HEALTH:
-		if (chg->use_bq_pump) {
-			rc = val->intval = -ENODATA;
-			break;
-		}
 		rc = val->intval = smblib_get_prop_smb_health(chg);
 		break;
 	/* Use this property to report overheat status */
@@ -1991,7 +1987,6 @@ static int smb5_init_dc_psy(struct smb5 *chip)
  * BATT PSY REGISTRATION *
  *************************/
 static enum power_supply_property smb5_batt_props[] = {
-    POWER_SUPPLY_PROP_CHARGING_ENABLED,
 	POWER_SUPPLY_PROP_INPUT_SUSPEND,
 	POWER_SUPPLY_PROP_STATUS,
 	POWER_SUPPLY_PROP_HEALTH,
@@ -2030,7 +2025,6 @@ static enum power_supply_property smb5_batt_props[] = {
 	POWER_SUPPLY_PROP_FCC_STEPPER_ENABLE,
 	POWER_SUPPLY_PROP_BATTERY_CHARGING_ENABLED,
 	POWER_SUPPLY_PROP_SLOWLY_CHARGING,
-	POWER_SUPPLY_PROP_SYSTEM_TEMP_LEVEL,
 	POWER_SUPPLY_PROP_CAPACITY_LEVEL,
 	POWER_SUPPLY_PROP_TIME_TO_FULL_NOW,
 	POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN,
@@ -2054,9 +2048,6 @@ static int smb5_batt_get_prop(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_PRESENT:
 		rc = smblib_get_prop_batt_present(chg, val);
-		break;
-	case POWER_SUPPLY_PROP_CHARGING_ENABLED:
-		val->intval = !get_effective_result(chg->chg_disable_votable);
 		break;
 	case POWER_SUPPLY_PROP_INPUT_SUSPEND:
 		rc = smblib_get_prop_input_suspend(chg, val);
@@ -2197,9 +2188,6 @@ static int smb5_batt_get_prop(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_SLOWLY_CHARGING:
 		rc = smblib_get_prop_battery_slowly_charging(chg, val);
 		break;
-	case POWER_SUPPLY_PROP_SYSTEM_TEMP_LEVEL:
-		rc = smblib_get_prop_system_temp_level(chg, val);
-		break;
 	case POWER_SUPPLY_PROP_BQ_INPUT_SUSPEND:
 		rc = smblib_get_prop_battery_bq_input_suspend(chg, val);
 		break;
@@ -2240,9 +2228,6 @@ static int smb5_batt_set_prop(struct power_supply *psy,
 	switch (prop) {
 	case POWER_SUPPLY_PROP_STATUS:
 		rc = smblib_set_prop_batt_status(chg, val);
-		break;
-	case POWER_SUPPLY_PROP_CHARGING_ENABLED:
-		vote(chg->chg_disable_votable, USER_VOTER, !!!val->intval, 0);
 		break;
 	case POWER_SUPPLY_PROP_INPUT_SUSPEND:
 		rc = smblib_set_prop_input_suspend(chg, val);
@@ -2366,9 +2351,6 @@ static int smb5_batt_set_prop(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_SLOWLY_CHARGING:
 			rc = smblib_set_prop_battery_slowly_charging(chg, val);
 		break;
-	case POWER_SUPPLY_PROP_SYSTEM_TEMP_LEVEL:
-		rc = smblib_set_prop_system_temp_level(chg, val);
-		break;
 	default:
 		rc = -EINVAL;
 	}
@@ -2381,7 +2363,6 @@ static int smb5_batt_prop_is_writeable(struct power_supply *psy,
 {
 	switch (psp) {
 	case POWER_SUPPLY_PROP_STATUS:
-	case POWER_SUPPLY_PROP_CHARGING_ENABLED:
 	case POWER_SUPPLY_PROP_INPUT_SUSPEND:
 	case POWER_SUPPLY_PROP_SYSTEM_TEMP_LEVEL:
 	case POWER_SUPPLY_PROP_CAPACITY:

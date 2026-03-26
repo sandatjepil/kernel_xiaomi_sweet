@@ -102,7 +102,6 @@ enum print_reason {
 #define BATT_VERIFY_VOTER		"BATT_VERIFY_VOTER"
 
 #define PD_VERIFED_VOTER		"PD_VERIFED_VOTER"
-#define PD_UNVERIFED_VOTER  		"PD_UNVERIFED_VOTER"
 #define PD_REMOVE_COMP_VOTER		"PD_REMOVE_COMP_VOTER"
 
 /* used for bq charge pump solution */
@@ -115,7 +114,6 @@ enum print_reason {
 #define QC3P5_VOTER			"QC3P5_VOTER"
 #define FCC_MAX_QC3P5_VOTER		"FCC_MAX_QC3P5_VOTER"
 
-#define BYPASS_VOTER			"BYPASS_VOTER"
 #define BOOST_BACK_STORM_COUNT	3
 #define WEAK_CHG_STORM_COUNT	8
 
@@ -176,7 +174,7 @@ enum print_reason {
 #define SDP_100_MA			100000
 #define SDP_CURRENT_UA			500000
 #define CDP_CURRENT_UA			1500000
-#define DCP_CURRENT_UA			2200000
+#define DCP_CURRENT_UA			1600000
 #define HVDCP_CURRENT_UA		3000000
 #define HVDCP_CLASS_B_CURRENT_UA		3100000
 #define HVDCP2_CURRENT_UA		1500000

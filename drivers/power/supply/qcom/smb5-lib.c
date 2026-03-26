@@ -56,7 +56,6 @@
 bool skip_thermal = false;
 module_param(skip_thermal, bool, 0644);
 
-static int bypass_charging = 0;
 static void update_sw_icl_max(struct smb_charger *chg, int pst);
 static int smblib_get_prop_typec_mode(struct smb_charger *chg);
 static int smblib_set_sw_conn_therm_regulation(struct smb_charger *chg, bool enable);
@@ -750,9 +749,6 @@ int smblib_set_charge_param(struct smb_charger *chg,
 	if (!chg->cp_psy)
 		chg->cp_psy = power_supply_get_by_name("bq2597x-standalone");
 
-	if (!chg->cp_psy)
-		chg->cp_psy = power_supply_get_by_name("ln8000");
-
 	if (chg->cp_psy && param->reg == CHGR_FLOAT_VOLTAGE_CFG_REG) {
 		power_supply_get_property(chg->cp_psy, POWER_SUPPLY_PROP_CP_VBAT_CALIBRATE, &val);
 		if (val.intval >= -20000 && val.intval <= 20000) {
@@ -922,15 +918,6 @@ int smblib_set_fastcharge_mode(struct smb_charger *chg, bool enable)
 		enable = false;
 #endif
 
-	rc = power_supply_get_property(chg->usb_psy,
-				POWER_SUPPLY_PROP_PD_AUTHENTICATION, &pval);
-	if (rc < 0) {
-		smblib_err(chg, "Couldn't get pd authentic:%d\n", rc);
-		return rc;
-	}
-	if (!pval.intval)
-		enable = false;
-
 	/*if soc > 90 do not set fastcharge flag*/
 	rc = power_supply_get_property(chg->bms_psy,
 			POWER_SUPPLY_PROP_CAPACITY, &pval);
@@ -940,7 +927,7 @@ int smblib_set_fastcharge_mode(struct smb_charger *chg, bool enable)
 	}
 
 	if (chg->use_bq_pump)
-		fastcharge_soc_thr = 98;
+		fastcharge_soc_thr = 85;
 	else
 		fastcharge_soc_thr = 90;
 
@@ -973,7 +960,6 @@ int smblib_set_fastcharge_mode(struct smb_charger *chg, bool enable)
 	if (enable) {
 		/* ffc need clear 4.4V non_fcc_vfloat_voter first */
 		vote(chg->fv_votable, NON_FFC_VFLOAT_VOTER, false, 0);
-		vote(chg->fcc_votable, PD_UNVERIFED_VOTER, false, 0);
 		rc = power_supply_get_property(chg->bms_psy,
 				POWER_SUPPLY_PROP_FFC_CHG_TERMINATION_CURRENT, &pval);
 		if (rc < 0) {
@@ -2324,14 +2310,9 @@ static void smblib_get_start_vbat_before_step_charge(struct smb_charger *chg)
 int smblib_get_prop_input_suspend(struct smb_charger *chg,
 				  union power_supply_propval *val)
 {
-	if ((get_client_vote(chg->chg_disable_votable, BYPASS_VOTER) == 1)) {
-    val->intval = 1;
-  } else if (bypass_charging) {
-    val->intval = 2;
-  } else {
-    val->intval = 0;
-  }
-
+	val->intval
+		= (get_client_vote(chg->usb_icl_votable, USER_VOTER) == 0)
+		 && get_client_vote(chg->dc_suspend_votable, USER_VOTER);
 	return 0;
 }
 
@@ -2644,9 +2625,6 @@ static bool is_bq25970_available(struct smb_charger *chg)
 		chg->cp_psy = power_supply_get_by_name("bq2597x-standalone");
 
 	if (!chg->cp_psy)
-		chg->cp_psy = power_supply_get_by_name("ln8000");
-
-	if (!chg->cp_psy)
 		return false;
 
 	return true;
@@ -2906,14 +2884,14 @@ int smblib_set_prop_input_suspend(struct smb_charger *chg,
 	dump_stack();
 
 	/* vote 0mA when suspended */
-	rc = vote(chg->usb_icl_votable, USER_VOTER, false, 0);
+	rc = vote(chg->usb_icl_votable, USER_VOTER, (bool)val->intval, 0);
 	if (rc < 0) {
 		smblib_err(chg, "Couldn't vote to %s USB rc=%d\n",
 			(bool)val->intval ? "suspend" : "resume", rc);
 		return rc;
 	}
 
-	rc = vote(chg->dc_suspend_votable, USER_VOTER, false, 0);
+	rc = vote(chg->dc_suspend_votable, USER_VOTER, (bool)val->intval, 0);
 	if (rc < 0) {
 		smblib_err(chg, "Couldn't vote to %s DC rc=%d\n",
 			(bool)val->intval ? "suspend" : "resume", rc);
@@ -2922,23 +2900,6 @@ int smblib_set_prop_input_suspend(struct smb_charger *chg,
 
 	if (chg->use_bq_pump)
 		chg->bq_input_suspend = !!(val->intval);
-
-  if (val->intval == 1) {
-    rc = vote(chg->chg_disable_votable, BYPASS_VOTER, 1, 0);
-    bypass_charging = 0;
-  } else if (val->intval == 2) {
-    rc = vote(chg->chg_disable_votable, BYPASS_VOTER, 0, 0);
-    bypass_charging = 1;
-  } else {
-    rc = vote(chg->chg_disable_votable, BYPASS_VOTER, 0, 0);
-    bypass_charging = 0;
-  }
-
-  if (rc < 0) {
-    smblib_err(chg, "Couldn't vote to %d input_suspend rc=%d\n",
-      val->intval, rc);
-    return rc;
-  }
 
 	power_supply_changed(chg->batt_psy);
 	return rc;
@@ -3264,8 +3225,6 @@ static void smblib_thermal_setting_work(struct work_struct *work)
 int smblib_set_prop_system_temp_level(struct smb_charger *chg,
 				const union power_supply_propval *val)
 {
-  int system_temp_level = 0;
-  int thermal_mitigation_level = system_temp_level;
 	int rc;
         union power_supply_propval batt_temp ={0,};
 
@@ -3324,28 +3283,7 @@ int smblib_set_prop_system_temp_level(struct smb_charger *chg,
 	vote(chg->fcc_votable, THERMAL_DAEMON_VOTER, true,
 			chg->thermal_mitigation[chg->system_temp_level]);
 #endif
-
-  if (get_client_vote(chg->chg_disable_votable, BYPASS_VOTER) == 1) {
-    pr_info("%s bypass charging enabled",__FUNCTION__);
-    return vote(chg->chg_disable_votable, THERMAL_DAEMON_VOTER, true, 0);
-  }
-
-  if (bypass_charging) {
-    if (chg->thermal_levels - 2 > system_temp_level) system_temp_level = chg->thermal_levels-2;
-    if (system_temp_level < 0) system_temp_level = 0;
-    pr_info("%s limited charging enabled %d",__FUNCTION__, system_temp_level);
-  } else if (system_temp_level > 0) {
-    pr_info("%s charging enabled, but thermal limited %d",__FUNCTION__, system_temp_level);
-  }
-
-  if (thermal_mitigation_level >= chg->thermal_levels)
-    thermal_mitigation_level = chg->thermal_levels - 1;
-
-  if (thermal_mitigation_level == 0)
-    return vote(chg->fcc_votable, THERMAL_DAEMON_VOTER, false, 0);
-
-  return vote(chg->fcc_votable, THERMAL_DAEMON_VOTER, true,
-    chg->thermal_mitigation_icl[thermal_mitigation_level]);
+	return 0;
 }
 
 int smblib_set_prop_input_current_limited(struct smb_charger *chg,
@@ -6647,13 +6585,9 @@ static int check_reduce_fcc_condition(struct smb_charger *chg)
 
 	if (!chg->cp_psy) {
 		chg->cp_psy = power_supply_get_by_name("bq2597x-standalone");
-		if (!chg->cp_psy){
-			chg->cp_psy = power_supply_get_by_name("ln8000");
-			if (!chg->cp_psy){
-				pr_err("cp_psy not found\n");
-				return 0;
-			}
-		}
+		if (!chg->cp_psy)
+			pr_err("cp_psy not found\n");
+			return 0;
 	}
 
 	rc = power_supply_get_property(chg->cp_psy,
@@ -7032,8 +6966,8 @@ static bool qc3p5_vbus_timeout_check(struct smb_charger *chg,
 	return true;
 }
 
-#define	QC3P5_T_TA_DETECTION_TIMEOUT_PMIC_MS	1000
-#define	QC3P5_T_TA_CAP_TIMEOUT_PMIC_MS			1000
+#define	QC3P5_T_TA_DETECTION_TIMEOUT_PMIC_MS	200
+#define	QC3P5_T_TA_CAP_TIMEOUT_PMIC_MS			250
 #define	VBUS_5P5_V_UV							5500000
 #define	VBUS_6P4_V_UV							6400000
 #define	VBUS_6P65_V_UV							6650000
