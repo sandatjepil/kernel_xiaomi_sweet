@@ -1,6 +1,6 @@
 #
 # Automatically generated file; DO NOT EDIT.
-# Linux/arm64 4.14.356-openela-rc1 Kernel Configuration
+# Linux/arm64 4.14.357-openela Kernel Configuration
 #
 CONFIG_ARM64=y
 CONFIG_64BIT=y
@@ -743,8 +743,6 @@ CONFIG_CROSS_COMPILE_COMPAT=""
 CONFIG_SUSPEND=y
 CONFIG_SUSPEND_FREEZER=y
 CONFIG_SUSPEND_SKIP_SYNC=y
-CONFIG_POWERSUSPEND=y
-# CONFIG_POWERSUSPEND_DEBUG is not set
 # CONFIG_HIBERNATION is not set
 CONFIG_PM_SLEEP=y
 CONFIG_PM_SLEEP_SMP=y
